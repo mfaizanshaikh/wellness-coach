@@ -1,4 +1,4 @@
-# Wellness Coach Avatar
+# Wellness Coach
 
 Your personal AI wellness coach -- an always-on, Urdu-speaking 3D avatar that listens, understands, and helps you through stress, anxiety, and the emotional weight of daily life.
 
