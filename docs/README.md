@@ -57,6 +57,18 @@ docs/
 - **Product managers**: Read [product/prd.md](product/prd.md) and [architecture/high-level-design.md](architecture/high-level-design.md)
 - **Engineers**: Focus on [technical/tdd.md](technical/tdd.md), [technical/integration-flow.md](technical/integration-flow.md), and [architecture/](architecture/) docs
 
+---
+
+## Setup & Run (POC)
+
+- **Prerequisites**: Node.js 18+ and npm; OpenAI API access with realtime + TTS + Whisper endpoints enabled.
+- **Environment**: create `.env` in repo root with at minimum `OPENAI_API_KEY=<your-key>`. Optional: `FRONTEND_ORIGIN=http://localhost:5173`, `OPENAI_REALTIME_MODEL=gpt-realtime`, `OPENAI_REALTIME_VOICE=marin`.
+- **Install dependencies**: `npm install`
+- **Start backend (token/orchestration server)**: `npm run server` (defaults to port 3001)
+- **Start frontend (Vite dev server)**: in a second terminal run `npm run dev` (defaults to http://localhost:5173)
+- **Avatar asset**: ensure `public/avatar.vrm` exists; replace with your VRM to change the character.
+- **First interaction**: on page load, tap the “Tap to let me listen” overlay once to unlock AudioContext (browser gesture requirement). The avatar should greet in Urdu automatically and stay always-listening.
+
 ### Document Version
 
 | Field | Value |
