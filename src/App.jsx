@@ -40,6 +40,11 @@ export default function App() {
   const gestureTimeRef = useRef(0);
   const currentGestureRef = useRef(null);
   const gestureProgressRef = useRef(0);
+  const gestureDurationRef = useRef(0);
+  const nextIdleGestureRef = useRef(8 + Math.random() * 6);
+  const sessionStartingRef = useRef(false);
+  const retryTimerRef = useRef(null);
+  const primeOnceRef = useRef(false);
 
   const peerRef = useRef(null);
   const dataChannelRef = useRef(null);
@@ -56,9 +61,8 @@ export default function App() {
 
   const [status, setStatus] = useState(STATUS.idle);
   const [error, setError] = useState("");
-  const [log, setLog] = useState([]);
-  const [micActive, setMicActive] = useState(false);
   const [mouthDriver, setMouthDriver] = useState("Not ready");
+  const [primed, setPrimed] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -77,7 +81,7 @@ export default function App() {
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 100);
-    camera.position.set(0, 1.35, 3.2);
+    camera.position.set(0, 1.4, 2.2);
     cameraRef.current = camera;
 
     const hemi = new THREE.HemisphereLight(0xdde8ff, 0x101820, 1.2);
@@ -96,6 +100,40 @@ export default function App() {
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -0.05;
     scene.add(floor);
+
+    // Soft gradient backdrop behind the avatar for focus
+    const backdropMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        color1: { value: new THREE.Color(0x1a2e4d) },
+        color2: { value: new THREE.Color(0x0c1220) }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform vec3 color1;
+        uniform vec3 color2;
+        void main() {
+          float d = distance(vUv, vec2(0.5, 0.5));
+          float alpha = smoothstep(0.85, 0.55, d);
+          vec3 col = mix(color1, color2, vUv.y);
+          gl_FragColor = vec4(col, alpha * 0.9);
+        }
+      `,
+      transparent: true,
+      depthWrite: false
+    });
+    const backdrop = new THREE.Mesh(
+      new THREE.PlaneGeometry(10, 10, 1, 1),
+      backdropMaterial
+    );
+    backdrop.position.set(0, 1.4, -2.4);
+    scene.add(backdrop);
 
     const resize = () => {
       const { clientWidth, clientHeight } = canvas.parentElement;
@@ -139,8 +177,17 @@ export default function App() {
     });
   }, []);
 
+  useEffect(() => {
+    if (primed) {
+      startSession();
+    }
+    return () => stopSession();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primed]);
+
   const addLog = (message) => {
-    setLog((prev) => [message, ...prev].slice(0, 8));
+    // Keep console visibility for debugging without rendering logs on screen
+    console.debug(message);
   };
 
   const loadVrm = async (url) => {
@@ -186,6 +233,7 @@ export default function App() {
       setMouthDriver("No mouth driver found");
     }
     vrm.scene.position.set(0, 0, 0);
+    vrm.scene.scale.set(1.25, 1.25, 1.25);
     vrm.scene.rotation.y = Math.PI; // Face camera
 
     // Set relaxed arm pose (from T-pose)
@@ -216,6 +264,30 @@ export default function App() {
   };
 
   // Handle data channel messages for emotion detection
+  const triggerGestureFromText = (text) => {
+    const lower = text.toLowerCase();
+    const queue = [];
+    if (/\bwave\b/.test(lower) || /\bhand\b/.test(lower)) queue.push("wave");
+    if (/\bdance\b/.test(lower) || /\bgroove\b/.test(lower)) queue.push("dance");
+    if (/\bclose\b.*\beyes\b/.test(lower) || /\bcover\b.*\beyes\b/.test(lower)) queue.push("eyesClosed");
+    if (/\bpalms?\b.*\beyes\b/.test(lower)) queue.push("coverEyes");
+    if (/\bshrug\b/.test(lower)) queue.push("shrug");
+    if (/\bnod\b/.test(lower) || /\byes\b/.test(lower)) queue.push("nod");
+    if (/\btilt\b/.test(lower)) queue.push("tilt");
+    if (queue.length > 0) {
+      const next = queue[0];
+      startGesture(next);
+    }
+  };
+
+  const startGesture = (name) => {
+    const def = GESTURES[name];
+    if (!def) return;
+    currentGestureRef.current = name;
+    gestureDurationRef.current = def.duration;
+    gestureProgressRef.current = 0;
+  };
+
   const handleAIMessage = (data) => {
     try {
       const parsed = JSON.parse(data);
@@ -229,6 +301,7 @@ export default function App() {
         const emotion = detectEmotion(text);
         emotionRef.current = emotion;
         emotionIntensityRef.current = 1;
+        triggerGestureFromText(text);
       }
 
       // Detect if AI is speaking
@@ -251,6 +324,10 @@ export default function App() {
     handRaise: { duration: 1.2 },
     shrug: { duration: 1.0 },
     think: { duration: 1.5 },
+    wave: { duration: 1.6 },
+    dance: { duration: 2.8 },
+    eyesClosed: { duration: 1.2 },
+    coverEyes: { duration: 1.2 }
   };
 
   const animateIdle = (delta) => {
@@ -286,6 +363,7 @@ export default function App() {
     const rightUpperArm = vrm.humanoid?.getNormalizedBoneNode(VRMHumanBoneName.RightUpperArm);
     const leftLowerArm = vrm.humanoid?.getNormalizedBoneNode(VRMHumanBoneName.LeftLowerArm);
     const rightLowerArm = vrm.humanoid?.getNormalizedBoneNode(VRMHumanBoneName.RightLowerArm);
+    let forceBlinkValue = null;
 
     // Base breathing
     if (spine) {
@@ -364,6 +442,110 @@ export default function App() {
       rightLowerArm.rotation.z = THREE.MathUtils.damp(rightLowerArm.rotation.z, targetZ, 6, delta);
     }
 
+    // Personality idle gestures
+    if (
+      !speaking &&
+      !currentGestureRef.current &&
+      idleTimeRef.current > nextIdleGestureRef.current
+    ) {
+      const options = ["wave", "tilt", "shrug"];
+      const pick = options[Math.floor(Math.random() * options.length)];
+      startGesture(pick);
+      idleTimeRef.current = 0;
+      nextIdleGestureRef.current = 8 + Math.random() * 6;
+    }
+
+    // One-shot gestures layered on top
+    if (currentGestureRef.current) {
+      gestureProgressRef.current += delta;
+      const duration = gestureDurationRef.current || 1;
+      const p = Math.min(1, gestureProgressRef.current / duration);
+      const wavePhase = Math.sin(p * Math.PI * 4); // 2 back-and-forth waves
+
+      switch (currentGestureRef.current) {
+        case "wave":
+          if (rightUpperArm) {
+            const targetZ = -0.2;
+            const targetX = -0.4;
+            rightUpperArm.rotation.z = THREE.MathUtils.damp(rightUpperArm.rotation.z, targetZ, 10, delta);
+            rightUpperArm.rotation.x = THREE.MathUtils.damp(
+              rightUpperArm.rotation.x,
+              targetX,
+              10,
+              delta
+            );
+          }
+          if (rightLowerArm) {
+            const targetZ = -0.1 + wavePhase * 0.15;
+            rightLowerArm.rotation.z = THREE.MathUtils.damp(rightLowerArm.rotation.z, targetZ, 12, delta);
+          }
+          break;
+        case "dance":
+          if (chest) {
+            const targetY = Math.sin(t * 2) * 0.1;
+            const targetZ = Math.sin(t * 1.7) * 0.08;
+            chest.rotation.y = THREE.MathUtils.damp(chest.rotation.y, targetY, 6, delta);
+            chest.rotation.z = THREE.MathUtils.damp(chest.rotation.z, targetZ, 6, delta);
+          }
+          if (head) {
+            const targetZ = Math.sin(t * 1.5) * 0.05;
+            head.rotation.z = THREE.MathUtils.damp(head.rotation.z, targetZ, 6, delta);
+          }
+          break;
+        case "eyesClosed":
+          forceBlinkValue = 1;
+          break;
+        case "coverEyes":
+          forceBlinkValue = 1;
+          if (leftUpperArm) {
+            leftUpperArm.rotation.z = THREE.MathUtils.damp(leftUpperArm.rotation.z, 0.2, 10, delta);
+            leftUpperArm.rotation.x = THREE.MathUtils.damp(leftUpperArm.rotation.x, 0.6, 10, delta);
+          }
+          if (rightUpperArm) {
+            rightUpperArm.rotation.z = THREE.MathUtils.damp(rightUpperArm.rotation.z, -0.2, 10, delta);
+            rightUpperArm.rotation.x = THREE.MathUtils.damp(rightUpperArm.rotation.x, 0.6, 10, delta);
+          }
+          if (leftLowerArm) {
+            leftLowerArm.rotation.z = THREE.MathUtils.damp(leftLowerArm.rotation.z, 0.1, 10, delta);
+          }
+          if (rightLowerArm) {
+            rightLowerArm.rotation.z = THREE.MathUtils.damp(rightLowerArm.rotation.z, -0.1, 10, delta);
+          }
+          break;
+        case "nod":
+          if (head) {
+            const nod = Math.sin(p * Math.PI) * 0.35;
+            head.rotation.x = THREE.MathUtils.damp(head.rotation.x, nod, 10, delta);
+          }
+          break;
+        case "tilt":
+          if (head) {
+            const tilt = Math.sin(p * Math.PI) * 0.25;
+            head.rotation.z = THREE.MathUtils.damp(head.rotation.z, tilt, 10, delta);
+          }
+          break;
+        case "shrug":
+          if (leftUpperArm) {
+            leftUpperArm.rotation.z = THREE.MathUtils.damp(leftUpperArm.rotation.z, 0.9, 10, delta);
+          }
+          if (rightUpperArm) {
+            rightUpperArm.rotation.z = THREE.MathUtils.damp(rightUpperArm.rotation.z, -0.9, 10, delta);
+          }
+          if (chest) {
+            chest.rotation.z = THREE.MathUtils.damp(chest.rotation.z, 0.05, 10, delta);
+          }
+          break;
+        default:
+          break;
+      }
+
+      if (gestureProgressRef.current >= duration) {
+        currentGestureRef.current = null;
+        gestureProgressRef.current = 0;
+        gestureDurationRef.current = 0;
+      }
+    }
+
     // Apply emotion expressions
     const manager = vrm.expressionManager;
     if (manager) {
@@ -403,7 +585,8 @@ export default function App() {
           blinkValue = 1 - (blinkPhase - 0.1) / 0.1;
         }
       }
-      manager.setValue(VRMExpressionPresetName.Blink, blinkValue);
+      const blinkToSet = forceBlinkValue !== null ? forceBlinkValue : blinkValue;
+      manager.setValue(VRMExpressionPresetName.Blink, blinkToSet);
     }
   };
 
@@ -512,18 +695,24 @@ export default function App() {
     meter.style.transform = `scaleX(${level})`;
   };
 
-  const setMicEnabled = (enabled) => {
-    if (!localStreamRef.current) return;
-    localStreamRef.current.getTracks().forEach((track) => {
-      track.enabled = enabled;
-    });
-    setMicActive(enabled);
-    if (enabled && audioCtxRef.current && audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume().catch(() => {});
+  const primeAudio = async () => {
+    if (primeOnceRef.current) return;
+    primeOnceRef.current = true;
+    try {
+      const ctx = ensureAudioContext();
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+      setPrimed(true);
+    } catch (err) {
+      console.error("Audio prime failed", err);
+      primeOnceRef.current = false;
     }
   };
 
   const startSession = async () => {
+    if (sessionStartingRef.current || status === STATUS.live) return;
+    sessionStartingRef.current = true;
     setError("");
     setStatus(STATUS.connecting);
 
@@ -551,7 +740,12 @@ export default function App() {
       });
       localStreamRef.current = localStream;
       setupLocalAnalyser(localStream);
-      setMicEnabled(false);
+      localStream.getTracks().forEach((track) => {
+        track.enabled = true;
+      });
+      if (audioCtxRef.current && audioCtxRef.current.state === "suspended") {
+        await audioCtxRef.current.resume().catch(() => {});
+      }
 
       const pc = new RTCPeerConnection();
       peerRef.current = pc;
@@ -602,7 +796,14 @@ export default function App() {
       console.error(err);
       setError(err.message || "Connection failed");
       setStatus(STATUS.error);
+      if (!retryTimerRef.current) {
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          startSession();
+        }, 3000);
+      }
     }
+    sessionStartingRef.current = false;
   };
 
   const stopSession = () => {
@@ -621,75 +822,92 @@ export default function App() {
     localAnalyserRef.current = null;
     localAnalyserDataRef.current = null;
     audioCtxRef.current = null;
-    setMicActive(false);
     isSpeakingRef.current = false;
     emotionRef.current = "neutral";
     emotionIntensityRef.current = 0;
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    sessionStartingRef.current = false;
 
     setStatus(STATUS.idle);
+  };
+
+  const handleStop = () => {
+    if (status === STATUS.idle || status === STATUS.connecting) return;
+    stopSession();
+  };
+
+  const handleResume = () => {
+    if (!primed || status === STATUS.live || status === STATUS.connecting) return;
+    startSession();
   };
 
   return (
     <div className="app">
       <div className="header">
         <div>
-          <div className="title">Grok Companion</div>
-          <div className="subtitle">Realtime voice + 3D VRM avatar</div>
+          <div className="title">Your wellness coach</div>
+          <div className="subtitle">Hands-free, always-on guidance. Just speak and I respond.</div>
         </div>
-        <div className={`status status-${status.toLowerCase()}`}>
-          {status}
+        <div className="header-actions">
+          <div className={`status status-${status.toLowerCase()}`}>
+            {status}
+          </div>
+          <div className="action-buttons">
+            <button
+              className="btn ghost"
+              onClick={handleStop}
+              disabled={status === STATUS.idle || status === STATUS.connecting}
+            >
+              Stop
+            </button>
+            <button
+              className="btn primary"
+              onClick={handleResume}
+              disabled={!primed || status === STATUS.live || status === STATUS.connecting}
+            >
+              Resume
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="panel">
-        <div className="canvas-wrap">
-          <canvas ref={canvasRef} />
-          <div className="canvas-hint">Drop a VRM at public/avatar.vrm</div>
-        </div>
-        <div className="controls">
-          <button
-            className="primary"
-            onClick={startSession}
-            disabled={status === STATUS.connecting || status === STATUS.live}
-          >
-            Start Talking
-          </button>
-          <button
-            className={`ptt ${micActive ? "active" : ""}`}
-            disabled={status !== STATUS.live}
-            onPointerDown={() => setMicEnabled(true)}
-            onPointerUp={() => setMicEnabled(false)}
-            onPointerLeave={() => setMicEnabled(false)}
-            onContextMenu={(event) => event.preventDefault()}
-          >
-            Hold to Talk
-          </button>
-          <button
-            className="ghost"
-            onClick={stopSession}
-            disabled={status !== STATUS.live && status !== STATUS.error}
-          >
-            Stop
-          </button>
-          {error ? <div className="error">{error}</div> : null}
-          <div className="hint">Mouth driver: {mouthDriver}</div>
-        </div>
-        <div className="vad">
-          <div className="vad-label">Mic Level</div>
-          <div className="vad-track">
-            <div className="vad-fill" ref={vadMeterRef} />
-          </div>
-        </div>
-        <div className="log">
-          {log.length === 0 ? (
-            <div className="log-empty">Realtime events will show up here.</div>
-          ) : (
-            log.map((item, idx) => (
-              <div key={`${item}-${idx}`} className="log-item">
-                {item}
+      <div className="stage">
+        <div className="canvas-wrap centered">
+          {!primed ? (
+            <div
+              className="prime-overlay"
+              onPointerDown={primeAudio}
+              onClick={primeAudio}
+            >
+              <div className="prime-card">
+                <div className="prime-title">Tap to let me listen</div>
+                <div className="prime-sub">One tap to start audio & mic. Then I stay responsive.</div>
               </div>
-            ))
-          )}
+            </div>
+          ) : null}
+          <canvas ref={canvasRef} />
+        </div>
+
+        <div className="control-bar">
+          <div className="pill listening">
+            {primed
+              ? status === STATUS.live
+                ? "Listening and ready"
+                : status
+              : "Awaiting tap"}
+          </div>
+          <div className="meter">
+            <div className="vad-label">Mic Level</div>
+            <div className="vad-track">
+              <div className="vad-fill" ref={vadMeterRef} />
+            </div>
+          </div>
+          <div className="details">
+            {error ? <div className="error">{error}</div> : null}
+          </div>
         </div>
       </div>
     </div>
