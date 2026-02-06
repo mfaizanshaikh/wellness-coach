@@ -10,24 +10,24 @@ This repository contains all professional documentation for the **Always-On Urdu
 
 | Document | Path | Description |
 |----------|------|-------------|
-| High-Level Design & Architecture | `architecture/high-level-design.md` | System design, component responsibilities, and architectural decisions |
-| Architecture Diagram Description | `architecture/architecture-diagram.md` | Logical architecture, data flow, control flow, and real-time pipeline |
-| Tools, Technologies & Services | `architecture/tools-and-technologies.md` | Complete inventory of tools, SDKs, APIs, and services with POC vs. production suitability |
+| High-Level Design & Architecture | [architecture/high-level-design.md](architecture/high-level-design.md) | System design, component responsibilities, and architectural decisions |
+| Architecture Diagram Description | [architecture/architecture-diagram.md](architecture/architecture-diagram.md) | Logical architecture, data flow, control flow, and real-time pipeline |
+| Tools, Technologies & Services | [architecture/tools-and-technologies.md](architecture/tools-and-technologies.md) | Complete inventory of tools, SDKs, APIs, and services with POC vs. production suitability |
 
 ### Product Documentation
 
 | Document | Path | Description |
 |----------|------|-------------|
-| Business Requirements Document (BRD) | `product/brd.md` | Business goals, target users, problem statement, success criteria |
-| Product Requirements Document (PRD) | `product/prd.md` | User personas, journeys, functional and non-functional requirements |
-| POC Scope & Minimum Features | `product/poc-scope.md` | Prioritized feature list, must-haves vs. future scope |
+| Business Requirements Document (BRD) | [product/brd.md](product/brd.md) | Business goals, target users, problem statement, success criteria |
+| Product Requirements Document (PRD) | [product/prd.md](product/prd.md) | User personas, journeys, functional and non-functional requirements |
+| POC Scope & Minimum Features | [product/poc-scope.md](product/poc-scope.md) | Prioritized feature list, must-haves vs. future scope |
 
 ### Technical Documentation
 
 | Document | Path | Description |
 |----------|------|-------------|
-| Technical Design Document (TDD) | `technical/tdd.md` | Component-level overview, API responsibilities, data flow, error handling |
-| Integration & End-to-End Flow | `technical/integration-flow.md` | Step-by-step walkthrough of the complete user interaction pipeline |
+| Technical Design Document (TDD) | [technical/tdd.md](technical/tdd.md) | Component-level overview, API responsibilities, data flow, error handling |
+| Integration & End-to-End Flow | [technical/integration-flow.md](technical/integration-flow.md) | Step-by-step walkthrough of the complete user interaction pipeline |
 
 ---
 
@@ -53,9 +53,9 @@ docs/
 
 ### Audience
 
-- **Non-technical stakeholders**: Start with `product/brd.md` and `product/poc-scope.md`
-- **Product managers**: Read `product/prd.md` and `architecture/high-level-design.md`
-- **Engineers**: Focus on `technical/tdd.md`, `technical/integration-flow.md`, and `architecture/` docs
+- **Non-technical stakeholders**: Start with [product/brd.md](product/brd.md) and [product/poc-scope.md](product/poc-scope.md)
+- **Product managers**: Read [product/prd.md](product/prd.md) and [architecture/high-level-design.md](architecture/high-level-design.md)
+- **Engineers**: Focus on [technical/tdd.md](technical/tdd.md), [technical/integration-flow.md](technical/integration-flow.md), and [architecture/](architecture/) docs
 
 ### Document Version
 
