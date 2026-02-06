@@ -63,6 +63,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [mouthDriver, setMouthDriver] = useState("Not ready");
   const [primed, setPrimed] = useState(false);
+  const initialGreetingSentRef = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -314,6 +315,27 @@ export default function App() {
       }
     } catch {
       // Not JSON, ignore
+    }
+  };
+
+  const sendInitialGreeting = () => {
+    if (initialGreetingSentRef.current) return;
+    const dc = dataChannelRef.current;
+    if (!dc || dc.readyState !== "open") return;
+    initialGreetingSentRef.current = true;
+    const payload = {
+      type: "response.create",
+      response: {
+        modalities: ["audio", "text"],
+        input_text:
+          "براہِ کرم اردو میں مختصر انداز میں سلام کریں اور بتائیں کہ آپ سن رہے ہیں اور مدد کے لیے تیار ہیں۔"
+      }
+    };
+    try {
+      dc.send(JSON.stringify(payload));
+      addLog("initial.greeting.sent");
+    } catch (err) {
+      console.error("Failed to send greeting", err);
     }
   };
 
@@ -713,6 +735,7 @@ export default function App() {
   const startSession = async () => {
     if (sessionStartingRef.current || status === STATUS.live) return;
     sessionStartingRef.current = true;
+    initialGreetingSentRef.current = false;
     setError("");
     setStatus(STATUS.connecting);
 
@@ -756,6 +779,10 @@ export default function App() {
       dc.onmessage = (event) => {
         addLog(event.data);
         handleAIMessage(event.data);
+      };
+      dc.onopen = () => {
+        addLog("datachannel.open");
+        sendInitialGreeting();
       };
 
       pc.ontrack = (event) => {
@@ -825,6 +852,7 @@ export default function App() {
     isSpeakingRef.current = false;
     emotionRef.current = "neutral";
     emotionIntensityRef.current = 0;
+    initialGreetingSentRef.current = false;
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
