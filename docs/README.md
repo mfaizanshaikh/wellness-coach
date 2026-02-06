@@ -4,6 +4,18 @@
 
 This repository contains all professional documentation for the **Always-On Urdu-Speaking Wellness Coach Avatar** Proof of Concept (POC).
 
+## Preview
+
+### Desktop
+
+![Desktop view of the Wellness Coach Avatar](../public/website.png)
+
+### Mobile
+
+<p align="center">
+  <img src="../public/mobile_website.png" alt="Mobile view of the Wellness Coach Avatar" width="300" />
+</p>
+
 ---
 
 ### Architecture Documentation
