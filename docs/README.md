@@ -61,13 +61,111 @@ docs/
 
 ## Setup & Run (POC)
 
-- **Prerequisites**: Node.js 18+ and npm; OpenAI API access with realtime + TTS + Whisper endpoints enabled.
-- **Environment**: create `.env` in repo root with at minimum `OPENAI_API_KEY=<your-key>`. Optional: `FRONTEND_ORIGIN=http://localhost:5173`, `OPENAI_REALTIME_MODEL=gpt-realtime`, `OPENAI_REALTIME_VOICE=marin`.
-- **Install dependencies**: `npm install`
-- **Start backend (token/orchestration server)**: `npm run server` (defaults to port 3001)
-- **Start frontend (Vite dev server)**: in a second terminal run `npm run dev` (defaults to http://localhost:5173)
-- **Avatar asset**: ensure `public/avatar.vrm` exists; replace with your VRM to change the character.
-- **First interaction**: on page load, tap the “Tap to let me listen” overlay once to unlock AudioContext (browser gesture requirement). The avatar should greet in Urdu automatically and stay always-listening.
+### Prerequisites
+
+- **Node.js** 18 or higher (includes npm)
+- **OpenAI API key** with access to the Realtime API
+- **Modern browser** -- Chrome 90+ or Edge 90+ (WebRTC and WebGL required)
+- **Microphone** -- built-in or external
+
+### Step-by-Step Instructions
+
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/mfaizanshaikh/wellness-coach.git
+cd wellness-coach
+```
+
+**2. Install dependencies**
+
+```bash
+npm install
+```
+
+**3. Configure environment variables**
+
+Copy the example file and add your OpenAI API key:
+
+```bash
+cp .env.example .env
+```
+
+Open `.env` and replace the placeholder with your actual key:
+
+```
+OPENAI_API_KEY=sk-your-actual-api-key-here
+```
+
+The remaining variables have sensible defaults and are optional:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | *(required)* | Your OpenAI API key |
+| `OPENAI_REALTIME_MODEL` | `gpt-realtime` | Realtime conversation model |
+| `OPENAI_REALTIME_VOICE` | `marin` | AI voice for text-to-speech |
+| `OPENAI_REALTIME_INSTRUCTIONS` | Urdu wellness coach prompt | Overrides the built-in system prompt if set |
+| `FRONTEND_ORIGIN` | `http://localhost:5173` | CORS allowed origin |
+| `PORT` | `3001` | Backend server port |
+
+**4. Place your avatar model**
+
+Ensure a VRM file exists at `public/avatar.vrm`. The repository includes a default avatar. To use your own, replace this file with any VRM-format 3D model.
+
+**5. Start the backend server**
+
+```bash
+npm run server
+```
+
+You should see:
+
+```
+Realtime token server listening on :3001
+```
+
+**6. Start the frontend dev server** (in a second terminal)
+
+```bash
+npm run dev
+```
+
+You should see:
+
+```
+VITE v5.x.x  ready in xxx ms
+
+➜  Local:   http://localhost:5173/
+```
+
+**7. Open the app**
+
+Navigate to **http://localhost:5173** in Chrome or Edge.
+
+**8. Activate the session**
+
+- You will see the 3D avatar in a dark environment with a card that says **"Tap to let me listen"**
+- **Click or tap anywhere** on the overlay -- this unlocks the browser's audio context and microphone (a one-time browser requirement)
+- Your browser will ask for **microphone permission** -- grant it
+- The status badge in the top-right will change: **Idle** → **Connecting** → **Live**
+
+**9. Start talking**
+
+- Once the status shows **Live**, the avatar will greet you in Urdu automatically
+- **Just speak** -- no buttons needed. The mic level meter at the bottom confirms your voice is being captured
+- The avatar will respond in Urdu with lip-synced speech, facial expressions, and gestures
+- To end the session, click **Stop**. To restart, click **Resume**.
+
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Status stuck on "Connecting" | Check that the backend is running on port 3001 and your API key is valid |
+| "Failed to fetch client secret" | Verify `OPENAI_API_KEY` in `.env` has Realtime API access |
+| No audio from avatar | Make sure you clicked the tap-to-prime overlay; check browser isn't muting the tab |
+| Avatar not visible | Confirm `public/avatar.vrm` exists and is a valid VRM file |
+| Microphone not working | Check browser permissions -- click the lock icon in the address bar to verify mic access |
+| Repeated "Error" status | Network issue or OpenAI API outage; the system auto-retries every 3 seconds |
 
 ### Document Version
 
